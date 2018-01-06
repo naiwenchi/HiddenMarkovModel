@@ -43,6 +43,9 @@ namespace HiddenMarkovModel
             Console.WriteLine("This observation path is: "+observation);
             Console.WriteLine("The total probability of this observation path is: " + totalObsProb);
 
+            Viterbi myViterbi = new Viterbi(crazySoftDrinkMachine, observation);
+            myViterbi.calcBestStatusSequence();
+
             //Path myPath1 = new Path("lem,icet","CP,CP", crazySoftDrinkMachine);
             //double result1=myPath1.calculatePathProb();
             //Console.WriteLine(result1);
