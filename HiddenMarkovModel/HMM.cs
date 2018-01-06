@@ -7,6 +7,63 @@ using System.Threading.Tasks;
 
 namespace HiddenMarkovModel
 {
+    class Path
+    {
+        private HMM myHMM;
+        public string PathObservation;
+        public string PathStatus;
+        private List<Tuple<string, string>> pathNodes;
+        public double PathProbability;
+
+        public Path(string observations, string status, HMM _myHMM)
+        {
+            this.PathObservation = observations;
+            this.PathStatus = status;
+            string[] _statusTmp = status.Split(',');
+            string[] _observationTmp = observations.Split(',');
+
+            this.pathNodes = new List<Tuple<string, string>>();
+            for (int i = 0; i != _statusTmp.Length; i++)
+                pathNodes.Add(new Tuple<string, string>( _observationTmp[i], _statusTmp[i]));
+
+            this.myHMM = _myHMM;
+        }
+
+        public double calculatePathProb()
+        {
+            StringBuilder sb = new StringBuilder("debug for prob, PI:");
+
+            double result = 1.00;
+            string iniState = pathNodes[0].Item2;
+            result *= this.myHMM.PI[iniState]; //乘上初始機率
+            sb.Append(this.myHMM.PI[iniState]);
+            sb.Append(" A:");
+            //乘上aij，因為一次要看一個pair，所以做到Count-1才不會索引溢位
+            for (int i = 0; i != pathNodes.Count - 1; i++)
+            {
+                string comboIndexA = pathNodes[i].Item2 + "_" + pathNodes[i + 1].Item2;
+                result *= this.myHMM.A[comboIndexA];
+                sb.Append(this.myHMM.A[comboIndexA]);
+                sb.Append(" ,");
+            }
+            sb.Append(" B:");
+
+            for (int i = 0; i != pathNodes.Count; i++)
+            {
+                string comboIndexB = pathNodes[i].Item2 + "_" + pathNodes[i].Item1;
+                result *= this.myHMM.B[comboIndexB];
+                sb.Append(this.myHMM.B[comboIndexB]);
+                sb.Append(" ,");
+            }
+            Console.WriteLine(sb.ToString());
+            return result;
+
+        }
+
+
+    };
+
+
     class HMM
     {
         public HashSet<string> K;
