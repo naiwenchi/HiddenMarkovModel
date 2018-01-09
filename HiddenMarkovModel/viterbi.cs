@@ -12,14 +12,14 @@ namespace HiddenMarkovModel
         private string observation;
         private string[] obs;
         private int T;
-        public List<Tuple<int,string,string,double>> bestStatusSequence;
+        public List<Tuple<int,string,double>> bestStatusSequence;
         public double mostPossibleProb;
         public HMM myHmm;
         public Dictionary<string, double> deltaFunctions;
 
         public Viterbi(HMM _myHmm, string _observation)
         {
-            this.bestStatusSequence = new List<Tuple<int, string, string, double>>();
+            this.bestStatusSequence = new List<Tuple<int, string, double>>();
             this.myHmm = _myHmm;
             deltaFunctions = new Dictionary<string, double>();
             this.observation = _observation;
@@ -30,23 +30,26 @@ namespace HiddenMarkovModel
         public void calcBestStatusSequence()
         {
 
-            foreach (string tag_i in this.myHmm.S)
-            {
-                string Index_S_INI = tag_i + "_1";
-                deltaFunctions.Add(Index_S_INI, this.myHmm.PI[tag_i]);
-            }
 
-            DataTable dt = new DataTable("delta");
-            dt.Columns.Add("time", typeof(int));
-            dt.Columns.Add("tag_i", typeof(string));
-            dt.Columns.Add("tag_j", typeof(string));
-            dt.Columns.Add("value", typeof(double));
+
+            DataTable dtTotal = new DataTable("deltaInfo");
+            dtTotal.Columns.Add("time", typeof(int));
+            dtTotal.Columns.Add("tag_j", typeof(string));
+            dtTotal.Columns.Add("delta_j_t", typeof(double));
+
+            //第一期的delta必須獨立處理
+            foreach (string tag_j in this.myHmm.S)
+            {
+                string Index_S_INI = tag_j + "_1";
+                deltaFunctions.Add(Index_S_INI, this.myHmm.PI[tag_j]);
+                dtTotal.Rows.Add(1,tag_j, this.myHmm.PI[tag_j]);
+            }
 
             //舉例：當我在第3期的時候，視同i=2, j=3我要利用到所有的delta(tag_i,2)來計算任何一個delta(tag_j, 3)
             //進入i=3時，我確信所有的delta(tag_i,2)已經完成，離開迴圈之前，我要將所有的delta(tag_j, 3)放進dictionary，
             //但只要在i=4之前完成就好，否則i=4在存取dictiopnary時會找不到
 
-            for (int i = 1; i != T; i++) 
+            for (int i = 1; i != T; i++) //雖然我們這裡要從t=2開始討論，但是它會用到t=1代表「上一期」
             {
                 //因為我要求出每個tag_j的delta值，而它是由所有的tag_i來，所以tag_j放外層
                 foreach (string tag_j in this.myHmm.S) 
@@ -55,74 +58,76 @@ namespace HiddenMarkovModel
                     string Index_S_T1 = tag_j +"_"+ Convert.ToString(i); //上一期
                     string Index_S_T2 = tag_j +"_"+ Convert.ToString(j); //這一期
 
+                    //因為我們把所有的候選delta暫存放在一張表中
+                    DataTable dtCandidate = new DataTable("deltaInfo");
+                    dtCandidate.Columns.Add("time", typeof(int));
+                    dtCandidate.Columns.Add("tag_i", typeof(string));
+                    dtCandidate.Columns.Add("tag_j", typeof(string));
+                    dtCandidate.Columns.Add("delta_i_t", typeof(double));
+
                     //而tag_i當然放在內層，針對所有的tag_i對應之delta(tag_i, t-1)比大小取最大值
                     foreach (string tag_i in this.myHmm.S)
                     {
-                        double customDelta = 1;
-                        customDelta *= deltaFunctions[Index_S_T1];
-                        customDelta *= this.myHmm.A[tag_i + "_" + tag_j];
-                        customDelta *= this.myHmm.B[tag_i + "_" + obs[i]];
-                        dt.Rows.Add(i, tag_i, tag_j, customDelta);
+                        double customDelta = 1; //只是為了連乘積而作的暫時性賦值，無意義
+                        customDelta *= deltaFunctions[Index_S_T1]; //找出上一期的delta
+                        customDelta *= this.myHmm.A[tag_i + "_" + tag_j]; //乘上本期的A
+                        customDelta *= this.myHmm.B[tag_i + "_" + obs[i]]; //乘上本期的B
+                        //完成上述動作之後，我得到了很多「候選」的delta，
+                        //取了最大值以後才會得到delta(tag_j, t+1)
+                        dtCandidate.Rows.Add(i, tag_i, tag_j, customDelta);
                     }//end foreach tag_i
                      //至此已經算出所有delta(tag_i, t-1)的「加工品」，這時候才可以開始比大小，
                     //比完大小得到delta(tag_j, t)
 
-                    DataTable dt2 = dt.Clone(); //因為我們把所有的delta暫存放在一張表中，所以這裡要篩選出t=i
-                    DataRow[] selected = dt.Select("time='" + i + "'");
-                    foreach (DataRow row in selected)
-                        dt2.ImportRow(row);
-
-                    DataView dtView = new DataView(dt2);
-                    dtView.Sort = "value DESC";
+                    DataView dtView = new DataView(dtCandidate);
+                    dtView.Sort = "delta_i_t DESC";
                     //表示我要依"chiSquare"這個欄位排序， DESC是遞減，可寫ASC為遞增，預設也是遞增
                     DataTable sortedTable = dtView.ToTable(); //排序過後寫到另一個table上
 
-
                     string best_tag_i = Convert.ToString(sortedTable.Rows[0]["tag_i"]);
                     string best_tag_j = Convert.ToString(sortedTable.Rows[0]["tag_j"]);
-                    double best_value = Convert.ToDouble(sortedTable.Rows[0]["value"]);
+                    double best_value = Convert.ToDouble(sortedTable.Rows[0]["delta_i_t"]);
                     //至此，已經可以將單一的delta(tag_j, t)寫入dictionary
                     deltaFunctions.Add(Index_S_T2, best_value);
-
+                    //並且記錄在DataTable版的delta function總表當中，因為我們等一下要再排一次找最大路徑
+                    dtTotal.Rows.Add(i + 1, tag_j, best_value);
 
                 }//end foreach tag_j
-
+                //至此已經完成了所有t=i+1的delta function，因此「前一期」的最佳路徑已經可以計算，
+                //以現在t=2舉例，已經可以看t=1的最佳路徑，可是這麼寫會漏掉最後一期，所以我們還是得重跑
 
             }//end for i
 
-            //完成所有delta function後，最後才來找最佳path
-            for (int i = 0; i != T; i++)
+            //重跑迴圈找出最佳路徑，其實很簡單，沿途抓出該期delta function的最大值就好
+            for (int i = 1; i != T + 1; i++)
             {
-                foreach (string tag_i in this.myHmm.S)
-                {
-                    //string Index_S_T1 = tag_i + "_" + Convert.ToString(i+1); 
-                    //double customDelta = 1;
-                    //customDelta *= deltaFunctions[Index_S_T1];
-                    //customDelta *= this.myHmm.A[tag_i + "_" + tag_j];
-                    //customDelta *= this.myHmm.B[tag_i + "_" + obs[i]];
-                    //dt.Rows.Add(i, tag_i, tag_j, customDelta);
+                DataRow[] rowsBestPath = dtTotal.Select("time='" + i + "'");
 
-                    //this.bestStatusSequence.Add(new Tuple<int, string, string, double>(i, best_tag_i, best_tag_j, best_value));
-                    //Console.WriteLine("the best path element of t=" + i + " is " + tag_j + " , the prob of delta is: " + sortedTable.Rows[0]["value"]);
+                DataTable dtTempFinal = dtTotal.Clone();
+                foreach (DataRow row in rowsBestPath)
+                    dtTempFinal.ImportRow(row);
 
-                }//end tag_i
+                DataView dtView2 = new DataView(dtTempFinal);
+                dtView2.Sort = "delta_j_t DESC";
+                //表示我要依"chiSquare"這個欄位排序， DESC是遞減，可寫ASC為遞增，預設也是遞增
+                DataTable sortedTable2 = dtView2.ToTable(); //排序過後寫到另一個table上
 
+                string max_tag_j = Convert.ToString(sortedTable2.Rows[0]["tag_j"]);
+                double max_value = Convert.ToDouble(sortedTable2.Rows[0]["delta_j_t"]);
+                this.bestStatusSequence.Add(new Tuple<int, string, double>(i, max_tag_j, max_value));
 
             }
+            //至此找完最佳路徑
 
 
-
-
-
-            dt.WriteXml("bestPath.xml", XmlWriteMode.WriteSchema);
+            dtTotal.WriteXml("deltaFunction.xml", XmlWriteMode.WriteSchema);
 
             Console.WriteLine("The best path is..");
             for (int i = 0; i != this.bestStatusSequence.Count; i++)
             {
                 Console.Write(this.bestStatusSequence[i].Item1 + ",");
                 Console.Write(this.bestStatusSequence[i].Item2 + ",");
-                Console.Write(this.bestStatusSequence[i].Item3 + ",");
-                Console.WriteLine(this.bestStatusSequence[i].Item4);
+                Console.WriteLine(this.bestStatusSequence[i].Item3);
 
             }
 
