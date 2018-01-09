@@ -84,12 +84,35 @@ namespace HiddenMarkovModel
                     //至此，已經可以將單一的delta(tag_j, t)寫入dictionary
                     deltaFunctions.Add(Index_S_T2, best_value);
 
-                    this.bestStatusSequence.Add(new Tuple<int, string, string, double>(i, best_tag_i, best_tag_j, best_value));
-                    Console.WriteLine("the best path element of t=" + i + " is " + tag_j + " , the prob of delta is: " + sortedTable.Rows[0]["value"]);
 
                 }//end foreach tag_j
 
+
             }//end for i
+
+            //完成所有delta function後，最後才來找最佳path
+            for (int i = 0; i != T; i++)
+            {
+                foreach (string tag_i in this.myHmm.S)
+                {
+                    //string Index_S_T1 = tag_i + "_" + Convert.ToString(i+1); 
+                    //double customDelta = 1;
+                    //customDelta *= deltaFunctions[Index_S_T1];
+                    //customDelta *= this.myHmm.A[tag_i + "_" + tag_j];
+                    //customDelta *= this.myHmm.B[tag_i + "_" + obs[i]];
+                    //dt.Rows.Add(i, tag_i, tag_j, customDelta);
+
+                    //this.bestStatusSequence.Add(new Tuple<int, string, string, double>(i, best_tag_i, best_tag_j, best_value));
+                    //Console.WriteLine("the best path element of t=" + i + " is " + tag_j + " , the prob of delta is: " + sortedTable.Rows[0]["value"]);
+
+                }//end tag_i
+
+
+            }
+
+
+
+
 
             dt.WriteXml("bestPath.xml", XmlWriteMode.WriteSchema);
 
