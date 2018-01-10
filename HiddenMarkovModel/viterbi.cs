@@ -12,16 +12,18 @@ namespace HiddenMarkovModel
         private string observation;
         private string[] obs;
         private int T;
-        public List<Tuple<int,string,double>> bestStatusSequence;
+        public List<string> reversedBestStatusSequence;
         public double mostPossibleProb;
         public HMM myHmm;
         public Dictionary<string, double> deltaFunctions;
+        public Dictionary<string, string> psiFunctions;
 
         public Viterbi(HMM _myHmm, string _observation)
         {
-            this.bestStatusSequence = new List<Tuple<int, string, double>>();
+            this.reversedBestStatusSequence = new List<string>();
             this.myHmm = _myHmm;
             deltaFunctions = new Dictionary<string, double>();
+            psiFunctions = new Dictionary<string, string>();
             this.observation = _observation;
             obs = observation.Split(',');
             T = obs.Length;
@@ -36,6 +38,7 @@ namespace HiddenMarkovModel
             dtTotal.Columns.Add("time", typeof(int));
             dtTotal.Columns.Add("tag_j", typeof(string));
             dtTotal.Columns.Add("delta_j_t", typeof(double));
+            dtTotal.Columns.Add("psi_j_t-1",typeof(string));
 
             //第一期的delta必須獨立處理
             foreach (string tag_j in this.myHmm.S)
@@ -83,14 +86,23 @@ namespace HiddenMarkovModel
                     dtView.Sort = "delta_i_t DESC";
                     //表示我要依"chiSquare"這個欄位排序， DESC是遞減，可寫ASC為遞增，預設也是遞增
                     DataTable sortedTable = dtView.ToTable(); //排序過後寫到另一個table上
+                    //debug
+                    //for (int x = 0; x != sortedTable.Rows.Count; x++)
+                    //{
+                    //    Console.WriteLine(sortedTable.Rows[x]["tag_i"]+"\t"+sortedTable.Rows[x]["delta_i_t"]);
+                    //}
+                    //Console.WriteLine("rank is correct?");
+                    //Console.Read();
+
 
                     string best_tag_i = Convert.ToString(sortedTable.Rows[0]["tag_i"]);
-                    string best_tag_j = Convert.ToString(sortedTable.Rows[0]["tag_j"]);
+                    string current_tag_j = Convert.ToString(sortedTable.Rows[0]["tag_j"]);
                     double best_value = Convert.ToDouble(sortedTable.Rows[0]["delta_i_t"]);
                     //至此，已經可以將單一的delta(tag_j, t)寫入dictionary
                     deltaFunctions.Add(Index_S_T2, best_value);
+                    psiFunctions.Add(Index_S_T1, best_tag_i);
                     //並且記錄在DataTable版的delta function總表當中，因為我們等一下要再排一次找最大路徑
-                    dtTotal.Rows.Add(i + 1, tag_j, best_value);
+                    dtTotal.Rows.Add(i + 1, tag_j, best_value, best_tag_i);
 
                 }//end foreach tag_j
                 //至此已經完成了所有t=i+1的delta function，因此「前一期」的最佳路徑已經可以計算，
@@ -99,22 +111,29 @@ namespace HiddenMarkovModel
             }//end for i
 
             //重跑迴圈找出最佳路徑，其實很簡單，沿途抓出該期delta function的最大值就好
-            for (int i = 1; i != T + 1; i++)
+
+            //先用最後一期的delta值找到最後一個狀態 
+            DataRow[] rowsBestPath = dtTotal.Select("time='" + T + "'");
+
+            DataTable dtTempFinal = dtTotal.Clone();
+            foreach (DataRow row in rowsBestPath)
+                dtTempFinal.ImportRow(row);
+
+            DataView dtView2 = new DataView(dtTempFinal);
+            dtView2.Sort = "delta_j_t DESC";
+            //表示我要依"chiSquare"這個欄位排序， DESC是遞減，可寫ASC為遞增，預設也是遞增
+            DataTable sortedTable2 = dtView2.ToTable(); //排序過後寫到另一個table上
+
+            string max_tag_j = Convert.ToString(sortedTable2.Rows[0]["tag_j"]);
+            double max_value = Convert.ToDouble(sortedTable2.Rows[0]["delta_j_t"]);
+            reversedBestStatusSequence.Add(max_tag_j);
+
+            for (int i = T-1; i!=0; i--)
             {
-                DataRow[] rowsBestPath = dtTotal.Select("time='" + i + "'");
-
-                DataTable dtTempFinal = dtTotal.Clone();
-                foreach (DataRow row in rowsBestPath)
-                    dtTempFinal.ImportRow(row);
-
-                DataView dtView2 = new DataView(dtTempFinal);
-                dtView2.Sort = "delta_j_t DESC";
-                //表示我要依"chiSquare"這個欄位排序， DESC是遞減，可寫ASC為遞增，預設也是遞增
-                DataTable sortedTable2 = dtView2.ToTable(); //排序過後寫到另一個table上
-
-                string max_tag_j = Convert.ToString(sortedTable2.Rows[0]["tag_j"]);
-                double max_value = Convert.ToDouble(sortedTable2.Rows[0]["delta_j_t"]);
-                this.bestStatusSequence.Add(new Tuple<int, string, double>(i, max_tag_j, max_value));
+                string laterTag = reversedBestStatusSequence[reversedBestStatusSequence.Count - 1];
+                string psiIndex = laterTag + "_" + Convert.ToString(i);
+                string max_tag_i = this.psiFunctions[psiIndex];
+                reversedBestStatusSequence.Add(max_tag_i);
 
             }
             //至此找完最佳路徑
@@ -123,13 +142,12 @@ namespace HiddenMarkovModel
             dtTotal.WriteXml("deltaFunction.xml", XmlWriteMode.WriteSchema);
 
             Console.WriteLine("The best path is..");
-            for (int i = 0; i != this.bestStatusSequence.Count; i++)
+            for (int i = this.reversedBestStatusSequence.Count; i!=0; i--)
             {
-                Console.Write(this.bestStatusSequence[i].Item1 + ",");
-                Console.Write(this.bestStatusSequence[i].Item2 + ",");
-                Console.WriteLine(this.bestStatusSequence[i].Item3);
-
+                Console.Write(this.reversedBestStatusSequence[i-1] + ",");
             }
+
+            Console.WriteLine("The best path prob is :"+max_value);
 
         }
 
