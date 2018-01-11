@@ -74,10 +74,13 @@ namespace HiddenMarkovModel
                     foreach (string tag_i in this.myHmm.S)
                     {
                         string index_candidate = tag_i + "_" + Convert.ToString(i);
+                        //2018/01/11發現我把deltaFunction的index弄錯了，
+                        //它必須跟著上一期的狀態，也就是tag_i，以及上一期的期數
                         double customDelta = 1; //只是為了連乘積而作的暫時性賦值，無意義
                         customDelta *= deltaFunctions[index_candidate]; //找出上一期的delta
                         customDelta *= this.myHmm.A[tag_i + "_" + tag_j]; //乘上上期的A
-                        //B有問題
+                        //B有問題，原本把i-1寫成了i，所以有結果但是是錯的，差了一期，
+                        //把observation sequence跳了一格，因為陣列的index弄錯了 208/01/11解決
                         customDelta *= this.myHmm.B[tag_i + "_" + obs[i-1]]; //乘上上期的B
                         //完成上述動作之後，我得到了很多「候選」的delta，
                         //取了最大值以後才會得到delta(tag_j, t+1)
