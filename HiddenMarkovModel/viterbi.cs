@@ -77,7 +77,8 @@ namespace HiddenMarkovModel
                         double customDelta = 1; //只是為了連乘積而作的暫時性賦值，無意義
                         customDelta *= deltaFunctions[index_candidate]; //找出上一期的delta
                         customDelta *= this.myHmm.A[tag_i + "_" + tag_j]; //乘上上期的A
-                        customDelta *= this.myHmm.B[tag_i + "_" + obs[i]]; //乘上上期的B
+                        //B有問題
+                        customDelta *= this.myHmm.B[tag_i + "_" + obs[i-1]]; //乘上上期的B
                         //完成上述動作之後，我得到了很多「候選」的delta，
                         //取了最大值以後才會得到delta(tag_j, t+1)
                         dtCandidate.Rows.Add(i, tag_i, tag_j, customDelta);

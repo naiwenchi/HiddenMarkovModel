@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -22,6 +23,12 @@ namespace HiddenMarkovModel
             //GenerateAllPasswords("", 0, 4, bitch, result);
             //Console.WriteLine(result.Count);
 
+            DataTable dt = new DataTable("bruteForceRecords");
+            dt.Columns.Add("Status",typeof(string));
+            dt.Columns.Add("Prob_OAndS", typeof(string));
+            dt.Columns.Add("Prob_SunderO", typeof(string));
+
+
             HMM crazySoftDrinkMachine = new HMM();
             //Backtrack brute = new Backtrack(2, crazySoftDrinkMachine.S);
             Backtrack brute = new Backtrack(4, crazySoftDrinkMachine.S);
@@ -32,16 +39,24 @@ namespace HiddenMarkovModel
             //string observation = "lem,icet";
             string observation = "lem,icet,cola,lem";
             double totalObsProb = 0;
+            List<Tuple<string, double>> pathAndProb = new List<Tuple<string, double>>();
             for (int i = 0; i != result.Count; i++)
             {
                 Path myPath1 = new Path(observation,result[i], crazySoftDrinkMachine);
                 double result1=myPath1.calculatePathProb();
                 Console.WriteLine("This status path is: " + result[i]);
-                Console.WriteLine("The probablity is: " + result1);
+                Console.WriteLine("The probablity of P(o,s) is: " + result1);
+                pathAndProb.Add(new Tuple<string, double>(result[i], result1));
                 totalObsProb += result1;
             }
             Console.WriteLine("This observation path is: "+observation);
-            Console.WriteLine("The total probability of this observation path is: " + totalObsProb);
+            Console.WriteLine("The total probability of this observation path, P(o) is: " + totalObsProb);
+
+            foreach (Tuple<string, double> tb in pathAndProb)
+            {
+                dt.Rows.Add(tb.Item1, tb.Item2, tb.Item2 / totalObsProb);
+            }
+            dt.WriteXml("bruteForce.xml",XmlWriteMode.WriteSchema);
 
             Viterbi myViterbi = new Viterbi(crazySoftDrinkMachine, observation);
             myViterbi.calcBestStatusSequence();
