@@ -58,6 +58,8 @@ namespace HiddenMarkovModel
                 foreach (string tag_j in this.myHmm.S) 
                 {
                     int j = i + 1; //我已故意讓迴圈的i值呈現前一期，因此j值代表本期，兩者差1，方便我們的符號慣例
+                    //下面兩行：決定了這一期的delta的同時，也會同時決定上一期的psi，
+                    //兩個值對應的是同樣的tag，不同的t
                     string Index_S_T1 = tag_j +"_"+ Convert.ToString(i); //上一期
                     string Index_S_T2 = tag_j +"_"+ Convert.ToString(j); //這一期
 
@@ -71,13 +73,17 @@ namespace HiddenMarkovModel
                     //而tag_i當然放在內層，針對所有的tag_i對應之delta(tag_i, t-1)比大小取最大值
                     foreach (string tag_i in this.myHmm.S)
                     {
+                        string index_candidate = tag_i + "_" + Convert.ToString(i);
                         double customDelta = 1; //只是為了連乘積而作的暫時性賦值，無意義
-                        customDelta *= deltaFunctions[Index_S_T1]; //找出上一期的delta
-                        customDelta *= this.myHmm.A[tag_i + "_" + tag_j]; //乘上本期的A
-                        customDelta *= this.myHmm.B[tag_i + "_" + obs[i]]; //乘上本期的B
+                        customDelta *= deltaFunctions[index_candidate]; //找出上一期的delta
+                        customDelta *= this.myHmm.A[tag_i + "_" + tag_j]; //乘上上期的A
+                        customDelta *= this.myHmm.B[tag_i + "_" + obs[i]]; //乘上上期的B
                         //完成上述動作之後，我得到了很多「候選」的delta，
                         //取了最大值以後才會得到delta(tag_j, t+1)
                         dtCandidate.Rows.Add(i, tag_i, tag_j, customDelta);
+                        //debug
+                        Console.WriteLine("debug:"+i+"\t"+tag_i+"\t"+tag_j+"\t"+customDelta);
+                        //Console.Read();
                     }//end foreach tag_i
                      //至此已經算出所有delta(tag_i, t-1)的「加工品」，這時候才可以開始比大小，
                     //比完大小得到delta(tag_j, t)
@@ -87,11 +93,11 @@ namespace HiddenMarkovModel
                     //表示我要依"chiSquare"這個欄位排序， DESC是遞減，可寫ASC為遞增，預設也是遞增
                     DataTable sortedTable = dtView.ToTable(); //排序過後寫到另一個table上
                     //debug
-                    //for (int x = 0; x != sortedTable.Rows.Count; x++)
-                    //{
-                    //    Console.WriteLine(sortedTable.Rows[x]["tag_i"]+"\t"+sortedTable.Rows[x]["delta_i_t"]);
-                    //}
-                    //Console.WriteLine("rank is correct?");
+                    for (int x = 0; x != sortedTable.Rows.Count; x++)
+                    {
+                        Console.WriteLine(sortedTable.Rows[x]["tag_i"] + "\t" + sortedTable.Rows[x]["delta_i_t"]);
+                    }
+                    Console.WriteLine("rank is correct?");
                     //Console.Read();
 
 
